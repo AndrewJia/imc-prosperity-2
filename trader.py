@@ -32,9 +32,9 @@ class Trader:
                 acceptable_price_buy = 9999
                 acceptable_price_sell = 10001
                 
-                if current_position <= -10:
+                if current_position <= -15:
                     acceptable_price_buy = 10000
-                if current_position >= 10:
+                if current_position >= 15:
                     acceptable_price_sell = 10000
                 
             else:
