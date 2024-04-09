@@ -94,7 +94,7 @@ logger = Logger()
 
 class Trader:
 
-    starfruit_cache = [5000,5000,5000,5000]
+    starfruit_cache = []
     starfruit_dim = 4
 
     #robbery
@@ -133,10 +133,32 @@ class Trader:
                 acceptable_price_buy = 9999
                 acceptable_price_sell = 10001
                 
-                if current_position <= -15:
+                '''if current_position <= -5:
                     acceptable_price_buy = 10000
-                if current_position >= 15:
-                    acceptable_price_sell = 10000
+                if current_position >= 5:
+                    acceptable_price_sell = 10000'''
+
+                # if price is good, buy all that we can
+                # if resetting position (price=10000) buy until we hit 0
+                for (ask_price, ask_amount) in list(order_depth.sell_orders.items()):
+                    if int(ask_price) <= acceptable_price_buy:
+                        #logger.print("BUY", product, str(-ask_amount) + "x", ask_price)
+                        #orders.append(Order(product, ask_price, -ask_amount))
+                        logger.print("BUY", product, str(-ask_amount) + "x", min(20-current_position, -ask_amount))
+                        orders.append(Order(product, ask_price, min(20-current_position, -ask_amount)))
+                        current_position += min(20-current_position, -ask_amount)
+
+                for (bid_price, bid_amount) in list(order_depth.buy_orders.items()):
+                    if int(bid_price) >= acceptable_price_sell:
+                        #logger.print("SELL", product, str(bid_amount) + "x", bid_price)
+                        #orders.append(Order(product, bid_price, -bid_amount))
+                        logger.print("SELL", product, str(bid_amount) + "x", max(-20-current_position, -bid_amount))
+                        orders.append(Order(product, bid_price, max(-20-current_position, -bid_amount)))
+                        current_position += max(-20-current_position, -bid_amount)
+                
+                # reset position
+                orders.append(Order(product, 10000, -current_position))
+
                 
             else:
                 s_price = self.calc_next_price_starfruit()
@@ -151,23 +173,25 @@ class Trader:
                 best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
 
                 self.starfruit_cache.append((best_ask+best_bid)/2)
+                if len(self.starfruit_cache) < self.starfruit_dim:
+                    continue
 
 
+                for (ask_price, ask_amount) in list(order_depth.sell_orders.items()):
+                    if int(ask_price) <= acceptable_price_buy:
+                        #logger.print("BUY", product, str(-ask_amount) + "x", ask_price)
+                        #orders.append(Order(product, ask_price, -ask_amount))
+                        logger.print("BUY", product, str(-ask_amount) + "x", 20-current_position)
+                        orders.append(Order(product, ask_price, 20-current_position))
+                        break
 
-            
-            for (ask_price, ask_amount) in list(order_depth.sell_orders.items()):
-                if int(ask_price) <= acceptable_price_buy:
-                    logger.print("BUY", product, str(-ask_amount) + "x", ask_price)
-                    orders.append(Order(product, ask_price, -ask_amount))
-                    #orders.append(Order(product, ask_price, 20-current_position))
-                    break
-
-            for (bid_price, bid_amount) in list(order_depth.buy_orders.items()):
-                if int(bid_price) >= acceptable_price_sell:
-                    logger.print("SELL", product, str(bid_amount) + "x", bid_price)
-                    orders.append(Order(product, bid_price, -bid_amount))
-                    #orders.append(Order(product, bid_price, -20-current_position))
-                    break
+                for (bid_price, bid_amount) in list(order_depth.buy_orders.items()):
+                    if int(bid_price) >= acceptable_price_sell:
+                        #logger.print("SELL", product, str(bid_amount) + "x", bid_price)
+                        #orders.append(Order(product, bid_price, -bid_amount))
+                        logger.print("SELL", product, str(bid_amount) + "x", -20-current_position)
+                        orders.append(Order(product, bid_price, -20-current_position))
+                        break
             
             result[product] = orders
     
