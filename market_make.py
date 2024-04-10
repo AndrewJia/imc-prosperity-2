@@ -128,6 +128,7 @@ class Trader:
             if product in state.position:
                 current_position = state.position[product]
             else:
+                state.position[product] = 0
                 current_position = 0
 
             if product == 'AMETHYSTS':
@@ -152,7 +153,7 @@ class Trader:
                     orders.append(Order(product, best_bid, max(-20-current_position, -best_bid_amount)))
                     current_position += max(-20-current_position, -best_bid_amount)
 
-                
+                logger.print("position before market making is ", current_position, state.position[product])
                 # reset position
                 #orders.append(Order(product, 10000, -current_position))
                 
@@ -160,10 +161,13 @@ class Trader:
                 # undercut best ask/bid if it is profitable
                 # if not profitable, undercut 2nd best; if no 2nd best, take the +/- 5 positions
                 # 
+                max_sell_amt = min(20+current_position, 20+state.position[product])
+                max_buy_amt = min(20-current_position, 20-state.position[product])
+                
                 if best_ask - 1 > 10000:
-                    orders.append(Order(product, best_ask - 1, -5))
+                    orders.append(Order(product, best_ask - 1, -max_sell_amt))
                 if best_bid + 1 < 10000:
-                    orders.append(Order(product, best_bid + 1, 5))
+                    orders.append(Order(product, best_bid + 1, max_buy_amt))
 
                 
             else:
