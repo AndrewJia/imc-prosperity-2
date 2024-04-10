@@ -95,15 +95,16 @@ logger = Logger()
 class Trader:
 
     starfruit_cache = []
-    starfruit_dim = 4
+    starfruit_dim = 6
 
     #robbery
     def calc_next_price_starfruit(self):
         # starfruit cache stores price from 1 day ago, current day resp
         # by price, here we mean mid price
 
-        coef = [-0.01869561,  0.0455032 ,  0.16316049,  0.8090892]
-        intercept = 4.481696494462085
+        coef = [0.31088816, 0.22427233, 0.14790473, 0.12669606, 0.09051234,
+       0.09689353]
+        intercept = 14.33334143594766
         nxt_price = intercept
         for i, val in enumerate(self.starfruit_cache):
             nxt_price += val * coef[i]
@@ -166,14 +167,20 @@ class Trader:
                 acceptable_price_buy = s_price - 1
                 acceptable_price_sell = s_price + 1
 
-                if len(self.starfruit_cache) == self.starfruit_dim:
-                    self.starfruit_cache.pop(0)
+                
 
                 best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
                 best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
 
-                self.starfruit_cache.append((best_ask+best_bid)/2)
-                if len(self.starfruit_cache) < self.starfruit_dim:
+                starfruit_len = len(self.starfruit_cache)
+                
+                if len(self.starfruit_cache) == self.starfruit_dim:
+                    self.starfruit_cache.pop(-1)
+                
+                self.starfruit_cache.insert(0, (best_ask+best_bid)/2)
+
+                if starfruit_len < self.starfruit_dim:
+                    logger.print(len(self.starfruit_cache))
                     continue
 
 
