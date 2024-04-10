@@ -95,16 +95,20 @@ logger = Logger()
 class Trader:
 
     starfruit_cache = []
-    starfruit_dim = 6
+    starfruit_dim = 4 #6
 
     #robbery
     def calc_next_price_starfruit(self):
         # starfruit cache stores price from 1 day ago, current day resp
         # by price, here we mean mid price
 
-        coef = [0.31088816, 0.22427233, 0.14790473, 0.12669606, 0.09051234,
-       0.09689353]
-        intercept = 14.33334143594766
+        ## dim 4 coef
+        coef = [-0.01869561,  0.0455032 ,  0.16316049,  0.8090892]
+        intercept = 4.481696494462085
+
+        ## dim 6 coef
+        #coef = [0.31088816, 0.22427233, 0.14790473, 0.12669606, 0.09051234, 0.09689353]
+        #intercept = 14.33334143594766
         nxt_price = intercept
         for i, val in enumerate(self.starfruit_cache):
             nxt_price += val * coef[i]
@@ -122,8 +126,10 @@ class Trader:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
             
+            buy_dep = len(order_depth.buy_orders)
+            sell_dep = len(order_depth.sell_orders)
             
-            logger.print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
+            logger.print("Buy Order depth : " + str(buy_dep) + ", Sell order depth : " + str(sell_dep))
 
             if product in state.position:
                 current_position = state.position[product]
@@ -133,15 +139,20 @@ class Trader:
 
             if product == 'AMETHYSTS':
                 
-                acceptable_price_buy = 9999
-                acceptable_price_sell = 10001
+                acceptable_price_buy = 9998
+                acceptable_price_sell = 10002
                 
-
-                
-
                 # if price is good, buy all that we can
                 best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
                 best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+
+                # get 2nd best ask_bid
+                sec_ask = 10005
+                sec_bid = 9995
+                if sell_dep >= 2:
+                    sec_ask, _ = list(order_depth.sell_orders.items())[1]
+                if buy_dep >= 2:
+                    sec_bid, _ = list(order_depth.buy_orders.items())[1]
 
                 if int(best_ask) <= acceptable_price_buy:
                     logger.print("BUY", product, min(20-current_position, -best_ask_amount), "x", best_ask)
@@ -154,20 +165,29 @@ class Trader:
                     current_position += max(-20-current_position, -best_bid_amount)
 
                 logger.print("position before market making is ", current_position, state.position[product])
+                
                 # reset position
                 #orders.append(Order(product, 10000, -current_position))
                 
                 # MARKET MAKING
-                # undercut best ask/bid if it is profitable
-                # if not profitable, undercut 2nd best; if no 2nd best, take the +/- 5 positions
-                # 
+                # if best ask/bid cannot be undercut we take it
+                # -> undercut 2nd best; if no 2nd best, take the +/- 5 positions
+                # if |position| > 15, undercut 2nd best; if no 2nd best, take the +/- 5 position
+                # if |position| > 8, ignore best price if its quantity is 1 or 2 and undercut 2nd
                 max_sell_amt = min(20+current_position, 20+state.position[product])
                 max_buy_amt = min(20-current_position, 20-state.position[product])
                 
+                # if can undercut best
                 if best_ask - 1 > 10000:
                     orders.append(Order(product, best_ask - 1, -max_sell_amt))
+                # can't undercut best
+                else:
+                    orders.append(Order(product, sec_ask - 1, -max_sell_amt))
+                    
                 if best_bid + 1 < 10000:
                     orders.append(Order(product, best_bid + 1, max_buy_amt))
+                else:
+                    orders.append(Order(product, sec_bid + 1, max_buy_amt))
 
                 
             else:
