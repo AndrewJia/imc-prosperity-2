@@ -181,10 +181,13 @@ class Trader:
                 if best_ask <= 10000 or current_position <= -15       \
                 or (current_position <= -8 and best_ask_amount <= 2)  \
                 or (current_position <= -5 and best_ask_amount <= 1):
-                    orders.append(Order(product, sec_ask - 1, -max_sell_amt))
+                    under_ask = sec_ask - 1
+                    orders.append(Order(product, under_ask, -max_sell_amt))
                 # undercut best
                 else:
                     under_ask = best_ask - 1
+                    if current_position <= -15:
+                        under_ask = max(10000, under_ask - 2)
                     if current_position <= -10:
                         under_ask = max(10000, under_ask - 1)
                     orders.append(Order(product, under_ask, -max_sell_amt))
@@ -193,13 +196,16 @@ class Trader:
                 if best_bid >= 10000 or current_position >= 15        \
                 or (current_position >= 8 and best_ask_amount <= 2)   \
                 or (current_position >= 5 and best_ask_amount <= 1):
-                    orders.append(Order(product, sec_bid + 1, max_buy_amt))
+                    under_bid = sec_bid + 1
+                    orders.append(Order(product, under_bid, max_buy_amt))
                 # can undercut best
                 else:
                     under_bid = best_bid + 1
-                    if current_position >= 10:
+                    if current_position >= 15:
+                        under_bid = min(10000, under_bid + 2)
+                    elif current_position >= 10:
                         under_bid = min(10000, under_bid + 1)
-                    orders.append(Order(product, best_bid + 1, max_buy_amt))
+                    orders.append(Order(product, under_bid, max_buy_amt))
 
                 
             else:
