@@ -260,14 +260,14 @@ class Trader:
                         current_position += max(-20-current_position, -best_bid_amount)
 
 
-                '''
+                
                 # MARKET MAKING
                 max_sell_amt = min(20+current_position, 20+state.position[product])
                 max_buy_amt = min(20-current_position, 20-state.position[product])
                 
                 
                 # undercut second
-                if best_ask <= 10000 or current_position <= -10:
+                if best_ask <= s_price or current_position <= -10:
                     under_ask = sec_ask - 1
                     #if current_position <= -5:
                     #    under_ask = max(10000, under_ask - 1)
@@ -278,15 +278,15 @@ class Trader:
                     under_ask = best_ask - 1
                     # try reset position
                     if current_position >= 18:
-                        orders.append(Order(product, max(10000, under_ask - 2), -5))
+                        orders.append(Order(product, max(s_price-1, under_ask - 2), -5))
                         max_sell_amt -= 5
-                        under_ask = max(10000, under_ask - 1)
-                    elif current_position >= 10:
-                        under_ask = max(10000, under_ask - 1)
+                        under_ask = max(s_price-1, under_ask - 1)
+                    #elif current_position >= 10:
+                    #    under_ask = max(s_price, under_ask - 1)
                     orders.append(Order(product, under_ask, -max_sell_amt))
 
                 # can't undercut best
-                if best_bid >= 10000 or current_position >= 10:
+                if best_bid >= s_price or current_position >= 10:
                     under_bid = sec_bid + 1
                     #if current_position <= -5:
                     #    under_bid = min(10000, under_bid + 1)
@@ -297,12 +297,12 @@ class Trader:
                     under_bid = best_bid + 1
                     # try reset position
                     if current_position <= -18:
-                        orders.append(Order(product, min(10000, under_bid + 2), 5))
+                        orders.append(Order(product, min(s_price+1, under_bid + 2), 5))
                         max_buy_amt -= 5
-                        under_bid = min(10000, under_bid + 1)
-                    elif current_position <= -10:
-                        under_bid = min(10000, under_bid + 1)
-                    orders.append(Order(product, under_bid, max_buy_amt)) '''
+                        under_bid = min(s_price+1, under_bid + 1)
+                    #elif current_position <= -10:
+                    #    under_bid = min(s_price, under_bid + 1)
+                    orders.append(Order(product, under_bid, max_buy_amt)) 
             
             result[product] = orders
     
