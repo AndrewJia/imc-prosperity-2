@@ -357,25 +357,25 @@ class Trader:
                 # undercut second
                 if best_ask <= s_price or current_position <= -40:
                     under_ask = sec_ask - 1
-                    orders.append(Order(product, under_ask, -max_sell_amt/1.5))
+                    orders.append(Order(product, under_ask, int(-max_sell_amt/1.5)))
                 # undercut best
                 else:
                     logger.print("undercut best sell")
                     under_ask = best_ask - 1
                     # try reset position
-                    orders.append(Order(product, under_ask, -max_sell_amt/1.5))
+                    orders.append(Order(product, under_ask, int(-max_sell_amt/1.5)))
 
                 # can't undercut best
                 if best_bid >= s_price or current_position >= 10:
                     under_bid = sec_bid + 1
                     #if current_position <= -5:
                     #    under_bid = min(10000, under_bid + 1)
-                    orders.append(Order(product, under_bid, max_buy_amt/2))
+                    orders.append(Order(product, under_bid, int(max_buy_amt/2)))
                 # can undercut best
                 else:
                     logger.print("undercut best buy")
                     under_bid = best_bid + 1
-                    orders.append(Order(product, under_bid, max_buy_amt/2)) 
+                    orders.append(Order(product, under_bid, int(max_buy_amt/2)))
 
                 # conversions
                 if current_position <= 0:
