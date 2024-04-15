@@ -336,52 +336,37 @@ class Trader:
                     self.orchid_cache.pop(-1)
                 self.orchid_cache.insert(0, (best_ask+best_bid)/2) # always insert to left
                         # if we don't got full cache, no market taking
-                if orchid_len == self.orchid_dim:          
-                    if int(best_ask) <= acceptable_price_buy:
-                        logger.print("BUY", product, -best_ask_amount, "x", best_ask)
-                        orders.append(Order(product, best_ask, -best_ask_amount))
-                        current_position += -best_ask_amount
-
-                    if int(best_bid) >= acceptable_price_sell:
-                        logger.print("SELL", product, -best_bid_amount, "x", best_bid)
-                        orders.append(Order(product, best_bid, -best_bid_amount))
-                        current_position += -best_bid_amount
-
-
-                
-                # MARKET MAKING
-                max_sell_amt = 60+state.position[product]
-                max_buy_amt = 20-state.position[product]
-                
-                
-                # undercut second
-                if best_ask <= s_price or current_position <= -40:
-                    under_ask = sec_ask - 1
-                    orders.append(Order(product, under_ask, int(-max_sell_amt/1.5)))
-                # undercut best
-                else:
-                    logger.print("undercut best sell")
-                    under_ask = best_ask - 1
-                    # try reset position
-                    orders.append(Order(product, under_ask, int(-max_sell_amt/1.5)))
-
-                # can't undercut best
-                if best_bid >= s_price or current_position >= 10:
-                    under_bid = sec_bid + 1
-                    #if current_position <= -5:
-                    #    under_bid = min(10000, under_bid + 1)
-                    orders.append(Order(product, under_bid, int(max_buy_amt/2)))
-                # can undercut best
-                else:
-                    logger.print("undercut best buy")
-                    under_bid = best_bid + 1
-                    orders.append(Order(product, under_bid, int(max_buy_amt/2)))
 
                 # conversions
-                if current_position <= 0:
-                    conversions = -int(current_position / 2)
+                #orchid_obs = state.observations.conversionObservations['ORCHIDS']
+                #logger.print(orchid_obs)
+                conversion_observations = {}
+                for product, observation in state.observations.conversionObservations.items():
+                    conversion_observations[product] = [
+                        observation.bidPrice,
+                        observation.askPrice,
+                        observation.transportFees,
+                        observation.exportTariff,
+                        observation.importTariff,
+                        observation.sunlight,
+                        observation.humidity,
+                    ]
+                
+                obs_ask_price = conversion_observations['ORCHIDS'][1]
+                obs_trans_fee = conversion_observations['ORCHIDS'][2]
+                obs_imp_tariff = conversion_observations['ORCHIDS'][4]
+                
+                orchid_totalPrice = obs_ask_price + obs_trans_fee + obs_imp_tariff
+                logger.print(orchid_totalPrice)
+                if orchid_totalPrice < best_bid:
+                    #conversions = best_bid_amount
+                    orders.append(Order(product, best_bid, -best_bid_amount))
+                
+                if current_position != 0:
+                    conversions = -current_position
                 else:
                     conversions = 0
+                
             result[product] = orders
     
     

@@ -99,6 +99,9 @@ class Trader:
     orchid_cache = []
     orchid_dim = 4
 
+    orchid_import_cache = []
+    orchid_sell_cache = []
+
     #robbery
     def calc_next_price_starfruit(self):
         # starfruit cache stores price from 1 day ago, current day resp
@@ -126,6 +129,13 @@ class Trader:
 
         return int(round(nxt_price))
     
+    def calc_weighted(self, cache):
+        coef = [.15, .2, .3, .35]
+        nxt_price = 0
+        for i, val in enumerate(cache):
+            nxt_price += val * coef[i]
+
+        return int(round(nxt_price))
     
     def run(self, state: TradingState):
         # Only method required. It takes all buy and sell orders for all symbols as an input, and outputs a list of orders to be sent
@@ -166,16 +176,16 @@ class Trader:
                     sec_bid, _ = list(order_depth.buy_orders.items())[1]
 
                 if int(best_ask) <= acceptable_price_buy:
-                    logger.print("BUY", product, min(20-current_position, -best_ask_amount), "x", best_ask)
+                    #logger.print("BUY", product, min(20-current_position, -best_ask_amount), "x", best_ask)
                     orders.append(Order(product, best_ask, min(20-current_position, -best_ask_amount)))
                     current_position += min(20-current_position, -best_ask_amount)
 
                 if int(best_bid) >= acceptable_price_sell:
-                    logger.print("SELL", product, max(-20-current_position, -best_bid_amount), "x", best_bid)
+                    #logger.print("SELL", product, max(-20-current_position, -best_bid_amount), "x", best_bid)
                     orders.append(Order(product, best_bid, max(-20-current_position, -best_bid_amount)))
                     current_position += max(-20-current_position, -best_bid_amount)
 
-                logger.print("position before market making is ", current_position, state.position[product])
+                #logger.print("position before market making is ", current_position, state.position[product])
                 
                 # MARKET MAKING
 
@@ -201,7 +211,7 @@ class Trader:
                     orders.append(Order(product, under_ask, -max_sell_amt))
                 # undercut best
                 else:
-                    logger.print("undercut best sell")
+                    #logger.print("undercut best sell")
                     under_ask = best_ask - 1
                     # try reset position
                     if current_position >= 18:
@@ -220,7 +230,7 @@ class Trader:
                     orders.append(Order(product, under_bid, max_buy_amt))
                 # can undercut best
                 else:
-                    logger.print("undercut best buy")
+                    #logger.print("undercut best buy")
                     under_bid = best_bid + 1
                     # try reset position
                     if current_position <= -18:
@@ -315,73 +325,65 @@ class Trader:
             
             if product == 'ORCHIDS':
                 s_price = self.calc_next_price_orchid()
-                logger.print(self.orchid_cache, "ORCHID PRICED AT ", s_price)
-                acceptable_price_buy = s_price - 1
-                acceptable_price_sell = s_price + 1
+                #logger.print(self.orchid_cache, "ORCHID PRICED AT ", s_price)
+                #acceptable_price_buy = s_price - 1
+                #acceptable_price_sell = s_price + 1
 
                 best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
                 best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
 
-                sec_ask = best_ask + 4  # idk these, might change later
-                sec_bid = best_bid - 4
-
-                if sell_dep >= 2:
-                    sec_ask, _ = list(order_depth.sell_orders.items())[1]
-                if buy_dep >= 2:
-                    sec_bid, _ = list(order_depth.buy_orders.items())[1]
-
-                #orchid cache logic
-                orchid_len = len(self.orchid_cache)
-                if len(self.orchid_cache) == self.orchid_dim:   # if at max len, pop last (right)
-                    self.orchid_cache.pop(-1)
-                self.orchid_cache.insert(0, (best_ask+best_bid)/2) # always insert to left
-                        # if we don't got full cache, no market taking
-                if orchid_len == self.orchid_dim:          
-                    if int(best_ask) <= acceptable_price_buy:
-                        logger.print("BUY", product, -best_ask_amount, "x", best_ask)
-                        orders.append(Order(product, best_ask, -best_ask_amount))
-                        current_position += -best_ask_amount
-
-                    if int(best_bid) >= acceptable_price_sell:
-                        logger.print("SELL", product, -best_bid_amount, "x", best_bid)
-                        orders.append(Order(product, best_bid, -best_bid_amount))
-                        current_position += -best_bid_amount
-
 
                 
-                # MARKET MAKING
-                max_sell_amt = 60+state.position[product]
-                max_buy_amt = 20-state.position[product]
-                
-                
-                # undercut second
-                if best_ask <= s_price or current_position <= -40:
-                    under_ask = sec_ask - 1
-                    orders.append(Order(product, under_ask, int(-max_sell_amt/1.5)))
-                # undercut best
-                else:
-                    logger.print("undercut best sell")
-                    under_ask = best_ask - 1
-                    # try reset position
-                    orders.append(Order(product, under_ask, int(-max_sell_amt/1.5)))
-
-                # can't undercut best
-                if best_bid >= s_price or current_position >= 10:
-                    under_bid = sec_bid + 1
-                    #if current_position <= -5:
-                    #    under_bid = min(10000, under_bid + 1)
-                    orders.append(Order(product, under_bid, int(max_buy_amt/2)))
-                # can undercut best
-                else:
-                    logger.print("undercut best buy")
-                    under_bid = best_bid + 1
-                    orders.append(Order(product, under_bid, int(max_buy_amt/2)))
 
                 # conversions
-                if current_position <= 0:
-                    conversions = -int(current_position / 2)
+                #orchid_obs = state.observations.conversionObservations['ORCHIDS']
+                #logger.print(orchid_obs)
+                conversion_observations = {}
+                for product, observation in state.observations.conversionObservations.items():
+                    conversion_observations[product] = [
+                        observation.bidPrice,
+                        observation.askPrice,
+                        observation.transportFees,
+                        observation.exportTariff,
+                        observation.importTariff,
+                        observation.sunlight,
+                        observation.humidity,
+                    ]
+                
+                obs_ask_price = conversion_observations['ORCHIDS'][1]
+                obs_trans_fee = conversion_observations['ORCHIDS'][2]
+                obs_imp_tariff = conversion_observations['ORCHIDS'][4]
+                
+                orchid_importtotalPrice = int(obs_ask_price + obs_trans_fee + obs_imp_tariff)
+                logger.print(orchid_importtotalPrice)
+
+                #orchid cache logic
+                orchid_len = len(self.orchid_import_cache)
+                if len(self.orchid_import_cache) == self.orchid_dim:   # if at max len, pop last (right)
+                    self.orchid_import_cache.pop(-1)
+                    self.orchid_sell_cache.pop(-1)
+                self.orchid_import_cache.insert(0, orchid_importtotalPrice) # always insert to left
+                self.orchid_sell_cache.insert(0, best_bid)
+                    #if not full cache gtfo
+                if orchid_len < self.orchid_dim:
+                    conversions = 0
+                    continue
+
+                # weighted avg here
+                # sell first
+                logger.print('sell prices', self.orchid_sell_cache, self.calc_weighted(self.orchid_sell_cache))
+                logger.print('import prices', self.orchid_import_cache, self.calc_weighted(self.orchid_import_cache))
+                
+                if best_bid > self.calc_weighted(self.orchid_import_cache):
+                    orders.append(Order(product, best_bid, -best_bid_amount))
+                
+                if orchid_importtotalPrice < self.calc_weighted(self.orchid_sell_cache):
+                    conversions = -current_position
                 else:
                     conversions = 0
+                    
+                #conversions = 0
+                
             result[product] = orders
     
     
