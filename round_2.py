@@ -234,7 +234,7 @@ class Trader:
                 
             if product == 'STARFRUIT':
                 s_price = self.calc_next_price_starfruit()
-                logger.print(self.starfruit_cache, "STARFRUIT PRICED AT ", s_price)
+                #logger.print(self.starfruit_cache, "STARFRUIT PRICED AT ", s_price)
                 acceptable_price_buy = s_price - 1
                 acceptable_price_sell = s_price + 1
 
@@ -257,12 +257,12 @@ class Trader:
                         # if we don't got full cache, no market taking
                 if starfruit_len == self.starfruit_dim:          
                     if int(best_ask) <= acceptable_price_buy:
-                        logger.print("BUY", product, min(20-current_position, -best_ask_amount), "x", best_ask)
+                        #logger.print("BUY", product, min(20-current_position, -best_ask_amount), "x", best_ask)
                         orders.append(Order(product, best_ask, min(20-current_position, -best_ask_amount)))
                         current_position += min(20-current_position, -best_ask_amount)
 
                     if int(best_bid) >= acceptable_price_sell:
-                        logger.print("SELL", product, max(-20-current_position, -best_bid_amount), "x", best_bid)
+                        #logger.print("SELL", product, max(-20-current_position, -best_bid_amount), "x", best_bid)
                         orders.append(Order(product, best_bid, max(-20-current_position, -best_bid_amount)))
                         current_position += max(-20-current_position, -best_bid_amount)
 
@@ -281,7 +281,7 @@ class Trader:
                     orders.append(Order(product, under_ask, -max_sell_amt))
                 # undercut best
                 else:
-                    logger.print("undercut best sell")
+                    #logger.print("undercut best sell")
                     under_ask = best_ask - 1
                     # try reset position
                     '''
@@ -301,7 +301,7 @@ class Trader:
                     orders.append(Order(product, under_bid, max_buy_amt))
                 # can undercut best
                 else:
-                    logger.print("undercut best buy")
+                    #logger.print("undercut best buy")
                     under_bid = best_bid + 1
                     '''
                     # try reset position
