@@ -233,8 +233,8 @@ class Trader:
                 best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
                 best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
 
-                sec_ask = best_ask + 2  # idk these, might change later
-                sec_bid = best_bid - 2
+                sec_ask = best_ask + 4  # idk these, might change later
+                sec_bid = best_bid - 4
 
                 if sell_dep >= 2:
                     sec_ask, _ = list(order_depth.sell_orders.items())[1]
@@ -247,8 +247,7 @@ class Trader:
                     self.starfruit_cache.pop(-1)
                 self.starfruit_cache.insert(0, (best_ask+best_bid)/2) # always insert to left
                         # if we don't got full cache, no market taking
-                if starfruit_len == self.starfruit_dim:        
-                    logger.print("time to market-take starfruit!")        
+                if starfruit_len == self.starfruit_dim:          
                     if int(best_ask) <= acceptable_price_buy:
                         logger.print("BUY", product, min(20-current_position, -best_ask_amount), "x", best_ask)
                         orders.append(Order(product, best_ask, min(20-current_position, -best_ask_amount)))
@@ -277,12 +276,13 @@ class Trader:
                     logger.print("undercut best sell")
                     under_ask = best_ask - 1
                     # try reset position
+                    '''
                     if current_position >= 18:
                         orders.append(Order(product, max(s_price-1, under_ask - 2), -5))
                         max_sell_amt -= 5
                         under_ask = max(s_price-1, under_ask - 1)
                     #elif current_position >= 10:
-                    #    under_ask = max(s_price, under_ask - 1)
+                    #    under_ask = max(s_price, under_ask - 1)  '''
                     orders.append(Order(product, under_ask, -max_sell_amt))
 
                 # can't undercut best
@@ -295,19 +295,20 @@ class Trader:
                 else:
                     logger.print("undercut best buy")
                     under_bid = best_bid + 1
+                    '''
                     # try reset position
                     if current_position <= -18:
                         orders.append(Order(product, min(s_price+1, under_bid + 2), 5))
                         max_buy_amt -= 5
                         under_bid = min(s_price+1, under_bid + 1)
                     #elif current_position <= -10:
-                    #    under_bid = min(s_price, under_bid + 1)
+                    #    under_bid = min(s_price, under_bid + 1) '''
                     orders.append(Order(product, under_bid, max_buy_amt)) 
             
             result[product] = orders
     
     
-        traderData = "SAMPLE" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
+        traderData = "GABAGOOL" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
         
         conversions = 0
         logger.flush(state, result, conversions, traderData)
