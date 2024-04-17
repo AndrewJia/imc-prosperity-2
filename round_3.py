@@ -202,40 +202,41 @@ class Trader:
 
         
         # MARKET MAKING
-        logger.print("making is ",making)
         if making == False: return
 
-        logger.print("we market making gift baskets")
+        #w_price = self.calc_weighted_dim(curr_cache)
         max_sell_amt = min(max_position+current_position, max_position+state.position[product])
         max_buy_amt = min(max_position-current_position, max_position-state.position[product])
+        spread = best_ask - best_bid
+
+        if spread > 8: return
         
-        # undercut second
+        # undercut second sell
         if best_ask <= w_price or current_position <= -max_position/2:
             under_ask = sec_ask - 1
-            orders.append(Order(product, under_ask, -max_sell_amt))
-        # undercut best
+            orders.append(Order(product, under_ask, round(-max_sell_amt/3)))
+        # undercut best sell
         else:
             #logger.print("undercut best sell")
             under_ask = best_ask - 1
-            orders.append(Order(product, under_ask, -max_sell_amt))
+            orders.append(Order(product, under_ask, round(-max_sell_amt/3)))
 
-        # can't undercut best
+        # undercut second buy
         if best_bid >= w_price or current_position >= max_position/2:
             under_bid = sec_bid + 1
-            #if current_position <= -5:
-            #    under_bid = min(10000, under_bid + 1)
-            orders.append(Order(product, under_bid, max_buy_amt))
-        # can undercut best
+            orders.append(Order(product, under_bid, round(max_buy_amt/3)))
+        # undercut best buy
         else:
             #logger.print("undercut best buy")
             under_bid = best_bid + 1
-            orders.append(Order(product, under_bid, max_buy_amt)) 
+            orders.append(Order(product, under_bid, round(max_buy_amt/3))) 
 
     def run(self, state: TradingState):
         # Only method required. It takes all buy and sell orders for all symbols as an input, and outputs a list of orders to be sent
         #print("traderData: " + state.traderData)
         #print("Observations: " + str(state.observations))
         #print(state.position)
+        conversions = 0
         result = {}
         for product in state.order_depths:
             order_depth: OrderDepth = state.order_depths[product]
@@ -360,12 +361,12 @@ class Trader:
                 self.starfruit_cache.insert(0, (best_ask+best_bid)/2) # always insert to left
                         # if we don't got full cache, no market taking
                 if starfruit_len == self.starfruit_dim:          
-                    if int(best_ask) <= acceptable_price_buy:
+                    if round(best_ask) <= acceptable_price_buy:
                         #logger.print("BUY", product, min(20-current_position, -best_ask_amount), "x", best_ask)
                         orders.append(Order(product, best_ask, min(20-current_position, -best_ask_amount)))
                         current_position += min(20-current_position, -best_ask_amount)
 
-                    if int(best_bid) >= acceptable_price_sell:
+                    if round(best_bid) >= acceptable_price_sell:
                         #logger.print("SELL", product, max(-20-current_position, -best_bid_amount), "x", best_bid)
                         orders.append(Order(product, best_bid, max(-20-current_position, -best_bid_amount)))
                         current_position += max(-20-current_position, -best_bid_amount)
@@ -448,7 +449,7 @@ class Trader:
                 obs_trans_fee = conversion_observations['ORCHIDS'][2]
                 obs_imp_tariff = conversion_observations['ORCHIDS'][4]
                 
-                orchid_importtotalPrice = int(obs_ask_price + obs_trans_fee + obs_imp_tariff)
+                orchid_importtotalPrice = (obs_ask_price + obs_trans_fee + obs_imp_tariff)
                 logger.print(orchid_importtotalPrice)
 
                 #orchid cache logic
@@ -476,7 +477,6 @@ class Trader:
                 else:
                     conversions = 0
                     
-                #conversions = 0
             
             #round 3
             elif product in ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']:
