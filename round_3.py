@@ -480,7 +480,7 @@ class Trader:
             
             #round 3
             elif product in ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']:
-                if product is 'GIFT_BASKET':
+                if product == 'GIFT_BASKET':
                     logger.print("running gift baskets")
                     self.round3(product, order_depth, orders, state, False, making=True)
                 else:
