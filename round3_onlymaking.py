@@ -110,7 +110,7 @@ class Trader:
         # by price, here we mean mid price
 
         ## dim 4 coef
-        coef = [-0.01869561,  0.0455032 ,  0.16316049,  0.8090892]
+        coef = [0.8090892, 0.16316049, 0.0455032, -0.01869561]
         intercept = 4.481696494462085
 
         ## dim 6 coef
@@ -123,7 +123,7 @@ class Trader:
         return int(round(nxt_price))
     
     def calc_next_price_orchid(self):
-        coef = [.15, .2, .3, .35]
+        coef = [.35, .3, .2, .15]
         intercept = 0
         nxt_price = intercept
         for i, val in enumerate(self.orchid_cache):
@@ -132,7 +132,7 @@ class Trader:
         return int(round(nxt_price))
     
     def calc_weighted(self, cache):
-        coef = [.15, .2, .3, .35]
+        coef = [.35, .3, .2, .15]
         nxt_price = 0
         for i, val in enumerate(cache):
             nxt_price += val * coef[i]
@@ -141,9 +141,9 @@ class Trader:
     
     def calc_weighted_dim(self, cache, dim=6):
         if dim == 4:
-            coef = [.15, .2, .3, .35]
+            coef = [.35, .3, .2, .15]
         elif dim == 6:
-            coef = [.1, .1, .15, .15, .2, .3]
+            coef = [.3, .2, .15, .15, .1, .1]
         else:
             logger.print("wrong dimensions!")
             return cache[0]
