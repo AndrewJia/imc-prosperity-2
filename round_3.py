@@ -105,12 +105,15 @@ class Trader:
     round3_caches = {'CHOCOLATE':[], 'STRAWBERRIES':[], 'ROSES':[], 'GIFT_BASKET':[]}
     position_limits = {'CHOCOLATE':250, 'STRAWBERRIES':350, 'ROSES':60, 'GIFT_BASKET':60}
 
+    arb_target = 0
+    gift_arb_pos = 0
+
     def calc_next_price_starfruit(self):
         # starfruit cache stores price from 1 day ago, current day resp
         # by price, here we mean mid price
 
         ## dim 4 coef
-        coef = [-0.01869561,  0.0455032 ,  0.16316049,  0.8090892]
+        coef = [0.8090892, 0.16316049, 0.0455032, -0.01869561]
         intercept = 4.481696494462085
 
         ## dim 6 coef
@@ -123,7 +126,7 @@ class Trader:
         return int(round(nxt_price))
     
     def calc_next_price_orchid(self):
-        coef = [.15, .2, .3, .35]
+        coef = [.35, .3, .2, .15]
         intercept = 0
         nxt_price = intercept
         for i, val in enumerate(self.orchid_cache):
@@ -132,7 +135,7 @@ class Trader:
         return int(round(nxt_price))
     
     def calc_weighted(self, cache):
-        coef = [.15, .2, .3, .35]
+        coef = [.35, .3, .2, .15]
         nxt_price = 0
         for i, val in enumerate(cache):
             nxt_price += val * coef[i]
@@ -141,9 +144,9 @@ class Trader:
     
     def calc_weighted_dim(self, cache, dim=6):
         if dim == 4:
-            coef = [.15, .2, .3, .35]
+            coef = [.35, .3, .2, .15]
         elif dim == 6:
-            coef = [.1, .1, .15, .15, .2, .3]
+            coef = [.3, .2, .15, .15, .1, .1]
         else:
             logger.print("wrong dimensions!")
             return cache[0]
@@ -157,7 +160,7 @@ class Trader:
         #price calculation
         curr_cache = self.round3_caches[product]
         w_price = self.calc_weighted_dim(curr_cache)
-        logger.print(product, " priced at ", w_price)
+        #logger.print(product, " priced at ", w_price)
 
         #get position data
         max_position = self.position_limits[product]
@@ -231,13 +234,82 @@ class Trader:
             under_bid = best_bid + 1
             orders.append(Order(product, under_bid, round(max_buy_amt/3))) 
 
+    def round3_arbitrage(self, state, result):
+        mvg_const = 0.5     # arbitrage target position moving average const
+        max_exposure = (58.333/60.0)  # target max exposure for arbitrage (at +/- max_range from mean)
+        buffer = 100         # how much spread we do nothing on (due to cost of buying/selling)
+        max_range = 110     # what value of spread leads to max exposure
+
+        sum_price = 4 * self.round3_caches['CHOCOLATE'][0] + 6 * self.round3_caches['STRAWBERRIES'][0] + self.round3_caches['ROSES'][0]
+        gift_price = self.round3_caches['GIFT_BASKET'][0]
+        logger.print(self.round3_caches['CHOCOLATE'][0], self.round3_caches['STRAWBERRIES'][0], self.round3_caches['ROSES'][0])
+        logger.print('gift price ', gift_price, ' sum price ', sum_price)
+        norm_spread =  gift_price - sum_price - 380
+        logger.print("norm_spread: ", norm_spread)
+
+        
+        if abs(norm_spread) < buffer:
+            curr_target = 0
+        else:
+            if norm_spread > 0:
+                curr_target = (60 * max_exposure) * (norm_spread - buffer) / (max_range - buffer)
+                curr_target = min(curr_target, 60*max_exposure) #limit curr_target to +/- 60
+            else:
+                curr_target = (60 * max_exposure) * (norm_spread + buffer) / (max_range - buffer)
+                curr_target = max(curr_target, -60*max_exposure)
+
+        if self.arb_target > 0:
+            self.arb_target = max(self.arb_target, curr_target)
+            if norm_spread < -buffer*(4/5):
+                self.arb_target = 0
+        elif self.arb_target < 0:
+            self.arb_target = min(self.arb_target, curr_target)
+            if norm_spread > buffer*(4/5):
+                self.arb_target = 0
+        else:
+            self.arb_target = curr_target
+
+        logger.print("curr_target: ", curr_target, "arb_target: ", self.arb_target)
+
+        self.round3_arb_order(state, state.order_depths['CHOCOLATE'], 'CHOCOLATE', 4, result)
+        self.round3_arb_order(state, state.order_depths['STRAWBERRIES'], 'STRAWBERRIES', 6, result)
+        self.round3_arb_order(state, state.order_depths['ROSES'], 'ROSES', 1, result)
+        self.round3_arb_order(state, state.order_depths['GIFT_BASKET'], 'GIFT_BASKET', -1, result)
+    
+    def round3_arb_order(self, state, order_depth, product, count_in_basket, result):
+        if product in state.position:
+            current_position = state.position[product]
+        else:
+            current_position = 0
+
+        if product == 'GIFT_BASKET': current_position = self.gift_arb_pos
+
+        target_position = round(self.arb_target * count_in_basket)
+
+        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+
+        # we gotta buy
+        if current_position < target_position: 
+            buying_amt = min(target_position - current_position, abs(best_ask_amount))
+            result[product].append(Order(product, best_ask, buying_amt))
+            if product == 'GIFT_BASKET': self.gift_arb_pos += buying_amt
+        # we gotta sell
+        elif current_position > target_position:
+            selling_amt = min(abs(target_position - current_position), abs(best_bid_amount))
+            result[product].append(Order(product, best_bid, -selling_amt))
+            if product == 'GIFT_BASKET': self.gift_arb_pos -= selling_amt
+
+
+        
+
     def run(self, state: TradingState):
         # Only method required. It takes all buy and sell orders for all symbols as an input, and outputs a list of orders to be sent
         #print("traderData: " + state.traderData)
         #print("Observations: " + str(state.observations))
         #print(state.position)
         conversions = 0
-        result = {}
+        result = {'GIFT_BASKET':[], 'CHOCOLATE':[], 'STRAWBERRIES':[], 'ROSES':[], 'GIFT_BASKET':[], 'STARFRUIT':[], 'AMETHYSTS':[], 'ORCHIDS':[]}
         for product in state.order_depths:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
@@ -336,7 +408,6 @@ class Trader:
                         under_bid = min(10000, under_bid + 1)
                     orders.append(Order(product, under_bid, max_buy_amt))
 
-                
             elif product == 'STARFRUIT':
                 s_price = self.calc_next_price_starfruit()
                 #logger.print(self.starfruit_cache, "STARFRUIT PRICED AT ", s_price)
@@ -428,8 +499,6 @@ class Trader:
                 best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
 
 
-                
-
                 # conversions
                 #orchid_obs = state.observations.conversionObservations['ORCHIDS']
                 #logger.print(orchid_obs)
@@ -466,8 +535,8 @@ class Trader:
 
                 # weighted avg here
                 # sell first
-                logger.print('sell prices', self.orchid_sell_cache, self.calc_weighted(self.orchid_sell_cache))
-                logger.print('import prices', self.orchid_import_cache, self.calc_weighted(self.orchid_import_cache))
+                #logger.print('sell prices', self.orchid_sell_cache, self.calc_weighted(self.orchid_sell_cache))
+                #logger.print('import prices', self.orchid_import_cache, self.calc_weighted(self.orchid_import_cache))
                 
                 if best_bid > self.calc_weighted(self.orchid_import_cache):
                     orders.append(Order(product, best_bid, -best_bid_amount))
@@ -481,16 +550,16 @@ class Trader:
             #round 3
             elif product in ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']:
                 if product == 'GIFT_BASKET':
-                    logger.print("running gift baskets")
-                    self.round3(product, order_depth, orders, state, False, making=True)
+                    #logger.print("running gift baskets")
+                    self.round3(product, order_depth, orders, state, False, making=False)
                 else:
-                    logger.print("running ", product)
+                    #logger.print("running ", product)
                     self.round3(product, order_depth, orders, state, False, False)
-                
+            
             result[product] = orders
+        self.round3_arbitrage(state, result)
     
-    
+
         traderData = "GABAGOOL" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
-        
         logger.flush(state, result, conversions, traderData)
         return result, conversions, traderData
