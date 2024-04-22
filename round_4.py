@@ -1,7 +1,8 @@
 from datamodel import Listing, Observation, Order, OrderDepth, ProsperityEncoder, Symbol, Trade, TradingState
-from typing import Any
+from typing import Any, List
 import string
 import json
+import random
 
 import collections
 from collections import defaultdict
