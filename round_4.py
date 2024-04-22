@@ -103,10 +103,12 @@ class Trader:
     orchid_sell_cache = []
 
     round3_caches = {'CHOCOLATE':[], 'STRAWBERRIES':[], 'ROSES':[], 'GIFT_BASKET':[]}
-    position_limits = {'CHOCOLATE':250, 'STRAWBERRIES':350, 'ROSES':60, 'GIFT_BASKET':60}
+    round4_caches = {'COCONUT':[], 'COCONUT_COUPON':[]}
+    position_limits = {'CHOCOLATE':250, 'STRAWBERRIES':350, 'ROSES':60, 'GIFT_BASKET':60, 'COCONUT':300, 'COCONUT_COUPON':600}
 
     arb_target = 0
     gift_arb_pos = 0
+    arb4_target4 = 0
 
     def calc_next_price_starfruit(self):
         # starfruit cache stores price from 1 day ago, current day resp
@@ -240,6 +242,8 @@ class Trader:
         buffer = 100         # how much spread we do nothing on (due to cost of buying/selling)
         max_range = 110     # what value of spread leads to max exposure
 
+        if len(self.round3_caches['CHOCOLATE']) < 4: return
+
         sum_price = 4 * self.round3_caches['CHOCOLATE'][0] + 6 * self.round3_caches['STRAWBERRIES'][0] + self.round3_caches['ROSES'][0]
         gift_price = self.round3_caches['GIFT_BASKET'][0]
         logger.print(self.round3_caches['CHOCOLATE'][0], self.round3_caches['STRAWBERRIES'][0], self.round3_caches['ROSES'][0])
@@ -286,22 +290,122 @@ class Trader:
 
         target_position = round(self.arb_target * count_in_basket)
 
-        best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-        best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-
         # we gotta buy
-        if current_position < target_position: 
+        if current_position < target_position and len(order_depth.sell_orders) > 0: 
+            best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+
             buying_amt = min(target_position - current_position, abs(best_ask_amount))
             result[product].append(Order(product, best_ask, buying_amt))
             if product == 'GIFT_BASKET': self.gift_arb_pos += buying_amt
         # we gotta sell
-        elif current_position > target_position:
+        elif current_position > target_position and len(order_depth.buy_orders) > 0:
+            best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+
             selling_amt = min(abs(target_position - current_position), abs(best_bid_amount))
             result[product].append(Order(product, best_bid, -selling_amt))
             if product == 'GIFT_BASKET': self.gift_arb_pos -= selling_amt
 
+    def round4_dumb(self, product, med, spread, order_depth, orders, max_pos, current_position):
+        acceptable_price_buy = med-spread
+        acceptable_price_sell = med+spread
+        
+        if len(order_depth.sell_orders) > 0:
+            best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+        
+            if int(best_ask) <= acceptable_price_buy:
+                orders.append(Order(product, best_ask, min(max_pos-current_position, -best_ask_amount)))
+                current_position += min(max_pos-current_position, -best_ask_amount)
+
+        if len(order_depth.buy_orders) > 0:
+            best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+
+            if int(best_bid) >= acceptable_price_sell:
+                orders.append(Order(product, best_bid, max(-max_pos-current_position, -best_bid_amount)))
+                current_position += max(-max_pos-current_position, -best_bid_amount)
+
+    def round4_update_cache(self, product, order_depth):
+        #price calculation
+        curr_cache = self.round4_caches[product]
+        w_price = self.calc_weighted_dim(curr_cache)
+        #logger.print(product, " priced at ", w_price)
+
+        buy_dep = len(order_depth.buy_orders)
+        sell_dep = len(order_depth.sell_orders)
+
+        if buy_dep > 0 and sell_dep > 0:
+            best_ask, _ = list(order_depth.sell_orders.items())[0]
+            best_bid, _ = list(order_depth.buy_orders.items())[0]
+            mid_price = (best_ask+best_bid)/2
+        else:
+            mid_price = curr_cache[0]
+
+        #cache logic
+        cache_len = len(curr_cache)
+        if cache_len == 6:   # if at max len, pop last (right)
+            curr_cache.pop(-1)
+        curr_cache.insert(0, mid_price) # always insert to left
+
+    def round4_arbitrage(self, state, result):
+        max_exposure = 1.0  # target max exposure for arbitrage (at +/- max_range from mean)
+        buffer = 23         # how much spread we do nothing on (due to cost of buying/selling)
+        max_range = 24     # what value of spread leads to max exposure
+
+        if len(self.round4_caches['COCONUT']) < 4: return 
+
+        nut_norm = self.round4_caches['COCONUT'][0] - 10000.0
+        coup_norm = self.round4_caches['COCONUT_COUPON'][0] - 637.5
+        
+        spread = (nut_norm) - 2*(coup_norm)
+        norm_spread = spread - 4.808
+        logger.print("round 4 spread:", norm_spread)
 
         
+        if abs(norm_spread) < buffer:
+            curr_target = 0
+        else:
+            if norm_spread > 0:
+                curr_target = (300 * max_exposure) * (norm_spread - buffer) / (max_range - buffer)
+                curr_target = min(curr_target, 300*max_exposure) #limit curr_target to +/- 300
+            else:
+                curr_target = (300 * max_exposure) * (norm_spread + buffer) / (max_range - buffer)
+                curr_target = max(curr_target, -300*max_exposure)
+
+        if self.arb4_target4 > 0:
+            self.arb4_target4 = max(self.arb4_target4, curr_target)
+            if norm_spread < -buffer*(4/5):
+                self.arb4_target4 = 0
+        elif self.arb4_target4 < 0:
+            self.arb4_target4 = min(self.arb4_target4, curr_target)
+            if norm_spread > buffer*(4/5):
+                self.arb4_target4 = 0
+        else:
+            self.arb4_target4 = curr_target
+
+        logger.print("curr_target: ", curr_target, "arb_target: ", self.arb4_target4)
+
+        self.round4_arb_order(state, state.order_depths['COCONUT'], 'COCONUT', -1, result)
+        self.round4_arb_order(state, state.order_depths['COCONUT_COUPON'], 'COCONUT_COUPON', 2, result)
+
+    def round4_arb_order(self, state, order_depth, product, count_in_basket, result):
+        if product in state.position:
+            current_position = state.position[product]
+        else:
+            current_position = 0
+
+        target_position = round(self.arb4_target4 * count_in_basket)
+
+        # we gotta buy
+        if current_position < target_position and len(order_depth.sell_orders) > 0: 
+            best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
+
+            buying_amt = min(target_position - current_position, abs(best_ask_amount))
+            result[product].append(Order(product, best_ask, buying_amt))
+        # we gotta sell
+        elif current_position > target_position and len(order_depth.buy_orders) > 0:
+            best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
+
+            selling_amt = min(abs(target_position - current_position), abs(best_bid_amount))
+            result[product].append(Order(product, best_bid, -selling_amt))
 
     def run(self, state: TradingState):
         # Only method required. It takes all buy and sell orders for all symbols as an input, and outputs a list of orders to be sent
@@ -309,7 +413,7 @@ class Trader:
         #print("Observations: " + str(state.observations))
         #print(state.position)
         conversions = 0
-        result = {'GIFT_BASKET':[], 'CHOCOLATE':[], 'STRAWBERRIES':[], 'ROSES':[], 'GIFT_BASKET':[], 'STARFRUIT':[], 'AMETHYSTS':[], 'ORCHIDS':[]}
+        result = {'GIFT_BASKET':[], 'CHOCOLATE':[], 'STRAWBERRIES':[], 'ROSES':[], 'GIFT_BASKET':[], 'STARFRUIT':[], 'AMETHYSTS':[], 'ORCHIDS':[], 'COCONUT':[], 'COCONUT_COUPON':[]}
         for product in state.order_depths:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
@@ -555,9 +659,14 @@ class Trader:
                 else:
                     #logger.print("running ", product)
                     self.round3(product, order_depth, orders, state, False, False)
+
+            #round 4
+            elif product in ['COCONUT', 'COCONUT_COUPON']:
+                self.round4_update_cache(product, order_depth)
             
             result[product] = orders
         self.round3_arbitrage(state, result)
+        self.round4_arbitrage(state, result)
     
 
         traderData = "GABAGOOL" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
